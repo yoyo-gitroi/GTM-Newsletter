@@ -772,7 +772,35 @@ def get_agent_config(agent_name: str, newsletter: dict, outputs: dict, monitored
     date_range = newsletter.get("date_range", "Last 7 days")
     custom_instructions = newsletter.get("custom_instructions", "")
     
+    # Get custom prompt from database (sync call via run_until_complete)
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    # Helper to get custom prompt
+    async def get_custom_prompt():
+        prompt_doc = await db.agent_prompts.find_one({"agent_name": agent_name}, {"_id": 0})
+        return prompt_doc
+    
+    custom_prompt_doc = None
+    try:
+        custom_prompt_doc = asyncio.get_event_loop().run_until_complete(get_custom_prompt())
+    except:
+        pass
+    
+    # Prepare outputs for each agent based on input chain
+    scout_output = outputs.get("scout", "No tool search data available") or "No tool search data available"
+    tracker_output = outputs.get("tracker", "No release data available") or "No release data available"
+    sage_output = outputs.get("sage", "No trend analysis available") or "No trend analysis available"
+    nexus_output = outputs.get("nexus", "No newsletter content available") or "No newsletter content available"
+    language_output = outputs.get("language", nexus_output) or nexus_output
+    
+    # Build system prompt based on agent
     if agent_name == "scout":
+        # Scout: Standalone - no input from other agents
         reference_section = ""
         if reference_content:
             reference_section = f"""
@@ -780,7 +808,14 @@ IMPORTANT: The following content was already covered in a previous newsletter. D
 {reference_content[:5000]}
 """
         
-        system_prompt = f"""## Role and Objective
+        if custom_prompt_doc and custom_prompt_doc.get("prompt"):
+            # Use custom prompt with variable substitution
+            system_prompt = custom_prompt_doc["prompt"]
+            system_prompt = system_prompt.replace("{{DATE_RANGE}}", date_range)
+            system_prompt = system_prompt.replace("{{CUSTOM_INSTRUCTIONS}}", custom_instructions)
+            system_prompt = system_prompt.replace("{{REFERENCE_SECTION}}", reference_section)
+        else:
+            system_prompt = f"""## Role and Objective
 
 You are Scout, a specialized Tool Search Agent that monitors and tracks new Go-To-Market (GTM) product launches across multiple platforms and news sources. Your mission is to identify emerging GTM tools and products, analyze their key characteristics, and deliver structured intelligence reports.
 
@@ -843,7 +878,14 @@ For each tool:
         return (system_prompt, "openai", "gpt-5.2")
     
     elif agent_name == "tracker":
-        system_prompt = f"""## Role and Objective
+        # Tracker: Standalone - no input from other agents
+        if custom_prompt_doc and custom_prompt_doc.get("prompt"):
+            system_prompt = custom_prompt_doc["prompt"]
+            system_prompt = system_prompt.replace("{{DATE_RANGE}}", date_range)
+            system_prompt = system_prompt.replace("{{MONITORED_TOOLS}}", monitored_tools)
+            system_prompt = system_prompt.replace("{{CUSTOM_INSTRUCTIONS}}", custom_instructions)
+        else:
+            system_prompt = f"""## Role and Objective
 You are Tracker, a specialized Release Search Agent that monitors and analyzes feature releases from key Go-To-Market (GTM) tools.
 
 Research Period: {date_range}
@@ -897,20 +939,25 @@ For each: Tool Name, Feature Name, Released Date, Source URL
         return (system_prompt, "openai", "gpt-5.2")
     
     elif agent_name == "sage":
-        scout_output = outputs.get("scout", "No tool search data available")
-        tracker_output = outputs.get("tracker", "No release data available")
-        
-        system_prompt = f"""## Role and Objective
+        # Sage: Input from Scout + Tracker
+        if custom_prompt_doc and custom_prompt_doc.get("prompt"):
+            system_prompt = custom_prompt_doc["prompt"]
+            system_prompt = system_prompt.replace("{{DATE_RANGE}}", date_range)
+            system_prompt = system_prompt.replace("{{SCOUT_OUTPUT}}", scout_output[:15000])
+            system_prompt = system_prompt.replace("{{TRACKER_OUTPUT}}", tracker_output[:15000])
+            system_prompt = system_prompt.replace("{{CUSTOM_INSTRUCTIONS}}", custom_instructions)
+        else:
+            system_prompt = f"""## Role and Objective
 You are Sage, a specialized Trend Analysis Agent that synthesizes intelligence from Tool Search and Release Search agents to identify cross-release patterns, cluster emerging trends, and provide strategic insights.
 
 {custom_instructions}
 
 ## Input Data
 
-### Tool Search Agent Output:
+### Tool Search Agent Output (Scout):
 {scout_output[:15000]}
 
-### Release Search Agent Output:
+### Release Search Agent Output (Tracker):
 {tracker_output[:15000]}
 
 ## Analysis Framework
@@ -947,10 +994,7 @@ For each trend (2-4 trends):
         return (system_prompt, "anthropic", "claude-sonnet-4-6")
     
     elif agent_name == "nexus":
-        sage_output = outputs.get("sage", "No trend analysis available")
-        tracker_output = outputs.get("tracker", "No release data available")
-        scout_output = outputs.get("scout", "No tool search data available")
-        
+        # Nexus: Input from Scout + Tracker + Sage
         reference_section = ""
         if reference_content:
             reference_section = f"""
@@ -958,7 +1002,16 @@ PREVIOUS NEWSLETTER (for deduplication — do NOT repeat content already covered
 {reference_content[:5000]}
 """
         
-        system_prompt = f"""## Role and Objective
+        if custom_prompt_doc and custom_prompt_doc.get("prompt"):
+            system_prompt = custom_prompt_doc["prompt"]
+            system_prompt = system_prompt.replace("{{DATE_RANGE}}", date_range)
+            system_prompt = system_prompt.replace("{{SCOUT_OUTPUT}}", scout_output[:10000])
+            system_prompt = system_prompt.replace("{{TRACKER_OUTPUT}}", tracker_output[:10000])
+            system_prompt = system_prompt.replace("{{SAGE_OUTPUT}}", sage_output[:15000])
+            system_prompt = system_prompt.replace("{{REFERENCE_SECTION}}", reference_section)
+            system_prompt = system_prompt.replace("{{CUSTOM_INSTRUCTIONS}}", custom_instructions)
+        else:
+            system_prompt = f"""## Role and Objective
 You are Nexus, a newsletter writer for GTM practitioners—specifically Account Executives and Sales Managers. Your job is to help them understand market patterns first, then show them what tools they can use immediately.
 
 Writing for: People who use GTM tools daily but aren't technical experts. They want context before details.
@@ -969,13 +1022,13 @@ Core Principle: Start with "here's what's happening across GTM tools" before div
 
 ## Input Data
 
-### Trend Analysis:
+### Trend Analysis (Sage):
 {sage_output[:15000]}
 
-### Release Data:
+### Release Data (Tracker):
 {tracker_output[:10000]}
 
-### Tool Search Data:
+### Tool Search Data (Scout):
 {scout_output[:10000]}
 
 {reference_section}
@@ -984,7 +1037,7 @@ Core Principle: Start with "here's what's happening across GTM tools" before div
 
 ### Header
 GTM Tech Newsletter
-Issue Date: [Current Date] | Monitoring Period: [Date Range]
+Issue Date: [Current Date] | Monitoring Period: {date_range}
 
 [OVERALL SUMMARY - Lead with the pattern, then preview actionable tools. 3-4 sentences.]
 
@@ -1038,9 +1091,13 @@ New tool launches that validate patterns.
         return (system_prompt, "anthropic", "claude-sonnet-4-6")
     
     elif agent_name == "language":
-        nexus_output = outputs.get("nexus", "No newsletter content available")
-        
-        system_prompt = f"""You are a professional newsletter editor. Understand the language and nuances of professional GTM newsletters and apply them to improve the input newsletter content.
+        # Language: Input from Nexus only
+        if custom_prompt_doc and custom_prompt_doc.get("prompt"):
+            system_prompt = custom_prompt_doc["prompt"]
+            system_prompt = system_prompt.replace("{{NEXUS_OUTPUT}}", nexus_output[:20000])
+            system_prompt = system_prompt.replace("{{CUSTOM_INSTRUCTIONS}}", custom_instructions)
+        else:
+            system_prompt = f"""You are a professional newsletter editor. Understand the language and nuances of professional GTM newsletters and apply them to improve the input newsletter content.
 
 ## Input Newsletter:
 {nexus_output[:20000]}
@@ -1070,15 +1127,31 @@ Produce the refined newsletter maintaining the same structure. Preserve all link
         return (system_prompt, "openai", "gpt-5.2")
     
     elif agent_name == "html":
-        language_output = outputs.get("language", outputs.get("nexus", "No newsletter content available"))
+        # HTML: Input from Language + Scout + Tracker + Sage
+        content_preview = language_output[:8000] if len(language_output) > 8000 else language_output
         
-        # Truncate content more aggressively for HTML generation
-        content_preview = language_output[:10000] if len(language_output) > 10000 else language_output
-        
-        system_prompt = f"""Convert this GTM newsletter into a professional HTML email.
+        if custom_prompt_doc and custom_prompt_doc.get("prompt"):
+            system_prompt = custom_prompt_doc["prompt"]
+            system_prompt = system_prompt.replace("{{LANGUAGE_OUTPUT}}", content_preview)
+            system_prompt = system_prompt.replace("{{SCOUT_OUTPUT}}", scout_output[:3000])
+            system_prompt = system_prompt.replace("{{TRACKER_OUTPUT}}", tracker_output[:3000])
+            system_prompt = system_prompt.replace("{{SAGE_OUTPUT}}", sage_output[:3000])
+        else:
+            system_prompt = f"""Convert this GTM newsletter into a professional HTML email.
 
-## Newsletter Content:
+## Newsletter Content (from Language Analyser):
 {content_preview}
+
+## Additional Context:
+
+### Tool Search Summary (Scout):
+{scout_output[:3000]}
+
+### Release Summary (Tracker):
+{tracker_output[:3000]}
+
+### Trend Analysis Summary (Sage):
+{sage_output[:3000]}
 
 ## Design Specs:
 - Fonts: Playfair Display (headings), Plus Jakarta Sans (body) via Google Fonts
