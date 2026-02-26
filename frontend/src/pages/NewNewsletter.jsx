@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API } from "@/lib/api";
 import { format, addDays } from "date-fns";
 import { CalendarIcon, ArrowRight, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function NewNewsletter() {
   const navigate = useNavigate();
