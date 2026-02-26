@@ -240,31 +240,149 @@ export default function Settings() {
         {/* API Configuration */}
         <Card className="border border-zinc-200">
           <CardHeader>
-            <CardTitle className="text-lg font-[Manrope]">API Configuration</CardTitle>
+            <CardTitle className="text-lg font-[Manrope] flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              API Configuration
+            </CardTitle>
             <CardDescription>
-              API keys are pre-configured for this deployment
+              Use your own API keys or the default Emergent integration
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-blue-800 font-medium">Emergent LLM Key Active</p>
-                <p className="text-xs text-blue-600 mt-0.5">
-                  Using GPT-5.2 and Claude Sonnet 4.6 via Emergent integration
-                </p>
+          <CardContent className="space-y-6">
+            {/* Toggle for custom keys */}
+            <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-10 h-10 rounded-lg flex items-center justify-center",
+                  settings.use_custom_keys ? "bg-emerald-100" : "bg-blue-100"
+                )}>
+                  <Key className={cn(
+                    "w-5 h-5",
+                    settings.use_custom_keys ? "text-emerald-600" : "text-blue-600"
+                  )} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-900">
+                    {settings.use_custom_keys ? "Using Custom API Keys" : "Using Emergent LLM Key"}
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {settings.use_custom_keys 
+                      ? "Your OpenAI and Anthropic keys will be used directly" 
+                      : "GPT-5.2 and Claude Sonnet 4.6 via Emergent integration"}
+                  </p>
+                </div>
               </div>
+              <Switch
+                checked={settings.use_custom_keys}
+                onCheckedChange={(checked) => setSettings({ ...settings, use_custom_keys: checked })}
+                data-testid="use-custom-keys-switch"
+              />
             </div>
+
+            {/* Custom API Keys Section */}
+            {settings.use_custom_keys && (
+              <div className="space-y-4 p-4 border rounded-lg bg-amber-50/50 border-amber-200">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">Enter your API keys</span>
+                </div>
+                
+                {/* OpenAI Key */}
+                <div className="space-y-2">
+                  <Label htmlFor="openai-key" className="text-zinc-700">OpenAI API Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="openai-key"
+                      type={showOpenAIKey ? "text" : "password"}
+                      placeholder="sk-..."
+                      value={settings.openai_api_key || ""}
+                      onChange={(e) => setSettings({ ...settings, openai_api_key: e.target.value })}
+                      className="pr-10 bg-white"
+                      data-testid="openai-api-key-input"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                      onClick={() => setShowOpenAIKey(!showOpenAIKey)}
+                    >
+                      {showOpenAIKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-zinc-500">Used for Scout, Tracker, Language, and HTML agents (GPT-5.2)</p>
+                </div>
+                
+                {/* Anthropic Key */}
+                <div className="space-y-2">
+                  <Label htmlFor="anthropic-key" className="text-zinc-700">Anthropic API Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="anthropic-key"
+                      type={showAnthropicKey ? "text" : "password"}
+                      placeholder="sk-ant-..."
+                      value={settings.anthropic_api_key || ""}
+                      onChange={(e) => setSettings({ ...settings, anthropic_api_key: e.target.value })}
+                      className="pr-10 bg-white"
+                      data-testid="anthropic-api-key-input"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                      onClick={() => setShowAnthropicKey(!showAnthropicKey)}
+                    >
+                      {showAnthropicKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-zinc-500">Used for Sage and Nexus agents (Claude Sonnet 4.6)</p>
+                </div>
+              </div>
+            )}
             
+            {/* Default Emergent Key Info */}
+            {!settings.use_custom_keys && (
+              <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">Emergent LLM Key Active</p>
+                  <p className="text-xs text-blue-600 mt-0.5">
+                    Using GPT-5.2 and Claude Sonnet 4.6 via Emergent integration
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {/* Models Info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 rounded-lg border bg-zinc-50">
                 <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">OpenAI Model</p>
                 <p className="text-sm font-medium text-zinc-900">GPT-5.2</p>
+                <p className="text-xs text-zinc-400 mt-1">Scout, Tracker, Language, HTML</p>
               </div>
               <div className="p-3 rounded-lg border bg-zinc-50">
                 <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Anthropic Model</p>
                 <p className="text-sm font-medium text-zinc-900">Claude Sonnet 4.6</p>
+                <p className="text-xs text-zinc-400 mt-1">Sage, Nexus</p>
               </div>
+            </div>
+            
+            {/* Save API Keys Button */}
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSaveApiKeys} 
+                disabled={saving.apiKeys}
+                className="gap-2"
+                data-testid="save-api-keys-btn"
+              >
+                {saving.apiKeys ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Save API Settings
+              </Button>
             </div>
           </CardContent>
         </Card>
