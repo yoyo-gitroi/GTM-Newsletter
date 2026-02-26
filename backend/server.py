@@ -344,71 +344,77 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
                     
                     # Get response
                     response = await chat.send_message(user_message)
-                
-                end_time = datetime.now(timezone.utc)
-                duration = int((end_time - start_time).total_seconds())
-                
-                # Store output
-                outputs[agent_name] = response
-                
-                # Update agent run
-                await db.agent_runs.update_one(
-                    {"id": run.id},
-                    {"$set": {
-                        "status": "completed",
-                        "output": response,
-                        "completed_at": end_time.isoformat(),
-                        "model": model_name,
-                        "duration": duration
-                    }}
-                )
-                
-                # Update newsletter with output
-                field_map = {
-                    "scout": "tool_search_output",
-                    "tracker": "release_search_output",
-                    "sage": "trend_analysis_output",
-                    "nexus": "assembled_newsletter",
-                    "language": "language_refined_output",
-                    "html": "html_output"
-                }
-                
-                update_data = {
-                    field_map[agent_name]: response,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }
-                
-                # Extract counts for scout and tracker
-                if agent_name == "scout":
-                    update_data["tools_found"] = count_tools(response)
-                elif agent_name == "tracker":
-                    update_data["releases_found"] = count_releases(response)
-                elif agent_name == "sage":
-                    update_data["patterns_found"] = count_patterns(response)
-                
-                await db.newsletters.update_one({"id": newsletter_id}, {"$set": update_data})
-                
-                logger.info(f"Agent {agent_name} completed for newsletter {newsletter_id}")
-                
-            except Exception as e:
-                logger.error(f"Agent {agent_name} failed: {str(e)}")
-                await db.agent_runs.update_one(
-                    {"id": run.id},
-                    {"$set": {
-                        "status": "failed",
-                        "error": str(e),
-                        "completed_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-                
-                # Update newsletter status to failed
-                await db.newsletters.update_one(
-                    {"id": newsletter_id},
-                    {"$set": {"status": "failed", "updated_at": datetime.now(timezone.utc).isoformat()}}
-                )
-                
-                active_pipelines[newsletter_id] = {"status": "failed", "current_agent": agent_name}
-                return
+                    
+                    end_time = datetime.now(timezone.utc)
+                    duration = int((end_time - start_time).total_seconds())
+                    
+                    # Store output
+                    outputs[agent_name] = response
+                    
+                    # Update agent run
+                    await db.agent_runs.update_one(
+                        {"id": run.id},
+                        {"$set": {
+                            "status": "completed",
+                            "output": response,
+                            "completed_at": end_time.isoformat(),
+                            "model": model_name,
+                            "duration": duration
+                        }}
+                    )
+                    
+                    # Update newsletter with output
+                    field_map = {
+                        "scout": "tool_search_output",
+                        "tracker": "release_search_output",
+                        "sage": "trend_analysis_output",
+                        "nexus": "assembled_newsletter",
+                        "language": "language_refined_output",
+                        "html": "html_output"
+                    }
+                    
+                    update_data = {
+                        field_map[agent_name]: response,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    
+                    # Extract counts for scout and tracker
+                    if agent_name == "scout":
+                        update_data["tools_found"] = count_tools(response)
+                    elif agent_name == "tracker":
+                        update_data["releases_found"] = count_releases(response)
+                    elif agent_name == "sage":
+                        update_data["patterns_found"] = count_patterns(response)
+                    
+                    await db.newsletters.update_one({"id": newsletter_id}, {"$set": update_data})
+                    
+                    logger.info(f"Agent {agent_name} completed for newsletter {newsletter_id}")
+                    break  # Success, exit retry loop
+                    
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_retries:
+                        logger.warning(f"Agent {agent_name} attempt {attempt + 1} failed, retrying: {str(e)}")
+                        await asyncio.sleep(5)  # Wait before retry
+                    else:
+                        logger.error(f"Agent {agent_name} failed after {max_retries + 1} attempts: {str(e)}")
+                        await db.agent_runs.update_one(
+                            {"id": run.id},
+                            {"$set": {
+                                "status": "failed",
+                                "error": str(e),
+                                "completed_at": datetime.now(timezone.utc).isoformat()
+                            }}
+                        )
+                        
+                        # Update newsletter status to failed
+                        await db.newsletters.update_one(
+                            {"id": newsletter_id},
+                            {"$set": {"status": "failed", "updated_at": datetime.now(timezone.utc).isoformat()}}
+                        )
+                        
+                        active_pipelines[newsletter_id] = {"status": "failed", "current_agent": agent_name}
+                        return
         
         # Pipeline completed successfully
         await db.newsletters.update_one(
