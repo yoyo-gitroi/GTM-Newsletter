@@ -103,9 +103,15 @@ class Settings(BaseModel):
     
     id: str = "default"
     monitored_tools: str = "Bitscale,Clay,Apollo,Amplemarket,UnifyGTM,HubSpot,SyftData,N8n,Relevance AI,Dust.tt,Crew.ai"
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    use_custom_keys: bool = False
 
 class SettingsUpdate(BaseModel):
     monitored_tools: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    use_custom_keys: Optional[bool] = None
 
 # ==================== HELPER FUNCTIONS ====================
 
