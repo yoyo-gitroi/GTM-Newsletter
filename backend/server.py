@@ -597,6 +597,8 @@ async def get_pipeline_status(newsletter_id: str):
 async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None):
     """Execute the full agent pipeline"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage
+    import anthropic
+    import openai
     
     agents = ["scout", "tracker", "sage", "nexus", "language", "html"]
     
@@ -611,9 +613,15 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
         if not newsletter:
             return
         
-        # Get settings for monitored tools
+        # Get settings for monitored tools and API keys
         settings = await db.settings.find_one({"id": "default"}, {"_id": 0})
         monitored_tools = settings.get("monitored_tools", "") if settings else ""
+        
+        # Determine which API keys to use
+        use_custom_keys = settings.get("use_custom_keys", False) if settings else False
+        openai_api_key = settings.get("openai_api_key") if settings else None
+        anthropic_api_key = settings.get("anthropic_api_key") if settings else None
+        emergent_key = os.environ.get("EMERGENT_LLM_KEY")
         
         # Get reference newsletter if specified
         reference_content = None
@@ -634,8 +642,6 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
             "language": newsletter.get("language_refined_output"),
             "html": newsletter.get("html_output")
         }
-        
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
         
         for agent_name in agents:
             active_pipelines[newsletter_id] = {"status": "running", "current_agent": agent_name}
