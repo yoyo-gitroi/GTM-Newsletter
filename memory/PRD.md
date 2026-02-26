@@ -7,29 +7,40 @@ Build a full-stack web application called "GTM Intelligence" that automates the 
 - **Frontend**: React 19 with Tailwind CSS, shadcn/ui components
 - **Backend**: FastAPI with MongoDB
 - **AI Integration**: Emergent LLM integration library (supports GPT-5.2 and Claude Sonnet 4.6)
-- **Database**: MongoDB for newsletters, agent runs, and settings
+- **Database**: MongoDB for newsletters, agent runs, settings, and custom prompts
 
 ## User Personas
 1. **GTM Practitioners** - Account Executives and Sales Managers who need weekly intelligence newsletters
 2. **Marketing Teams** - Teams tracking competitor tool releases and market trends
 
 ## Core Requirements (Static)
-- 6-agent AI pipeline (Scout, Tracker, Sage, Nexus, Language, HTML)
+- 6-agent AI pipeline with customizable prompts
 - Real-time pipeline monitoring with status updates
 - Newsletter creation with date range selection
 - Reference previous newsletters to avoid duplication
 - HTML email preview with download/copy functionality
 - Configurable monitored tools list
 
-## What's Been Implemented (Feb 26, 2026)
+## Agent Pipeline Flow (Updated Feb 26, 2026)
+```
+Scout (standalone) ──┐
+                     ├──► Sage ──► Nexus ──► Language ──► HTML
+Tracker (standalone) ┘         ↑           ↑            ↑
+                               │           │            │
+                    Scout+Tracker    Scout+Tracker+Sage   Language+Scout+Tracker+Sage
+```
+
+## What's Been Implemented
 
 ### Backend
-- [x] MongoDB models for Newsletter, AgentRun, Settings
+- [x] MongoDB models for Newsletter, AgentRun, Settings, AgentPrompt
 - [x] Full CRUD endpoints for newsletters
 - [x] Pipeline execution with all 6 agents
 - [x] Retry logic for transient API failures
 - [x] Stats endpoint for dashboard metrics
 - [x] Settings management for monitored tools
+- [x] **Agent Prompts API** - CRUD for custom prompts per agent
+- [x] **Custom prompt support** - Pipeline uses custom prompts when saved
 
 ### Frontend
 - [x] Dark sidebar layout with navigation
@@ -38,15 +49,18 @@ Build a full-stack web application called "GTM Intelligence" that automates the 
 - [x] Pipeline View with expandable agent cards
 - [x] Real-time status updates (polling every 3 seconds)
 - [x] HTML Preview page with tabs (Preview/Raw HTML)
-- [x] Settings page with API info and monitored tools
+- [x] **Settings page with Agent Prompts editor**
+- [x] **Pipeline flow diagram visualization**
+- [x] **Collapsible prompt editors with variable badges**
+- [x] **Save/Reset prompt functionality**
 
-### Agent Pipeline
-1. **Scout** (GPT-5.2) - Tool Search Agent - Discovers new GTM tool launches
-2. **Tracker** (GPT-5.2) - Release Search Agent - Monitors feature releases
-3. **Sage** (Claude Sonnet 4.6) - Trend Analysis Agent - Identifies patterns
-4. **Nexus** (Claude Sonnet 4.6) - Newsletter Assembler - Creates cohesive content
-5. **Language** (GPT-5.2) - Language Analyser - Refines tone and style
-6. **HTML** (GPT-5.2) - HTML Converter - Creates email-ready HTML
+### Agent Pipeline with Input Chain
+1. **Scout** (GPT-5.2) - Tool Search Agent - Standalone
+2. **Tracker** (GPT-5.2) - Release Search Agent - Standalone
+3. **Sage** (Claude Sonnet 4.6) - Trend Analysis - Inputs: Scout + Tracker
+4. **Nexus** (Claude Sonnet 4.6) - Newsletter Assembler - Inputs: Scout + Tracker + Sage
+5. **Language** (GPT-5.2) - Language Analyser - Inputs: Nexus
+6. **HTML** (GPT-5.2) - HTML Converter - Inputs: Language + Scout + Tracker + Sage
 
 ## Prioritized Backlog
 
@@ -62,7 +76,6 @@ Build a full-stack web application called "GTM Intelligence" that automates the 
 ### P2 (Medium Priority)
 - [ ] Newsletter export as JSON
 - [ ] Duplicate newsletter functionality
-- [ ] Custom agent prompts
 - [ ] Streaming text output during generation
 
 ### P3 (Low Priority)
@@ -75,4 +88,3 @@ Build a full-stack web application called "GTM Intelligence" that automates the 
 1. Add email integration (Resend) to send final HTML newsletters
 2. Implement user authentication
 3. Add inline editing for agent outputs
-4. Create version history for agent outputs
