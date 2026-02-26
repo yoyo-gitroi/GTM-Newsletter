@@ -679,21 +679,21 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
                     if use_custom_keys and ((model_provider == "openai" and openai_api_key) or (model_provider == "anthropic" and anthropic_api_key)):
                         # Use custom API keys directly
                         if model_provider == "openai" and openai_api_key:
-                            client = openai.AsyncOpenAI(api_key=openai_api_key)
-                            completion = await client.chat.completions.create(
+                            # Use the OpenAI Responses API for GPT-5.2
+                            client = openai.OpenAI(api_key=openai_api_key)
+                            api_response = client.responses.create(
                                 model=model_name,
-                                messages=[
-                                    {"role": "system", "content": system_prompt},
-                                    {"role": "user", "content": f"Execute your task for the monitoring period: {newsletter['date_range']}"}
-                                ],
-                                max_tokens=16000
+                                instructions=system_prompt,
+                                input=f"Execute your task for the monitoring period: {newsletter['date_range']}"
                             )
-                            response = completion.choices[0].message.content
+                            response = api_response.output_text
                         elif model_provider == "anthropic" and anthropic_api_key:
-                            client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
-                            message = await client.messages.create(
+                            # Use Anthropic Messages API for Claude
+                            client = anthropic.Anthropic(api_key=anthropic_api_key)
+                            message = client.messages.create(
                                 model=model_name,
-                                max_tokens=16000,
+                                max_tokens=20000,
+                                temperature=1,
                                 messages=[
                                     {"role": "user", "content": f"{system_prompt}\n\nExecute your task for the monitoring period: {newsletter['date_range']}"}
                                 ]
