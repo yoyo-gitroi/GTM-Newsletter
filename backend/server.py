@@ -727,47 +727,26 @@ Produce the refined newsletter maintaining the same structure. Preserve all link
     
     elif agent_name == "html":
         language_output = outputs.get("language", outputs.get("nexus", "No newsletter content available"))
-        sage_output = outputs.get("sage", "")
         
-        system_prompt = f"""You are an expert HTML email designer. Convert the provided GTM newsletter into an elegant, professional HTML email.
+        # Truncate content more aggressively for HTML generation
+        content_preview = language_output[:10000] if len(language_output) > 10000 else language_output
+        
+        system_prompt = f"""Convert this GTM newsletter into a professional HTML email.
 
-## Input Newsletter:
-{language_output[:20000]}
+## Newsletter Content:
+{content_preview}
 
-## Trend Analysis (for visual elements):
-{sage_output[:5000]}
+## Design Specs:
+- Fonts: Playfair Display (headings), Plus Jakarta Sans (body) via Google Fonts
+- Colors: Background #FDF6F0, Text #1A1A1A, Accent #E85A4F, Cards #FFFFFF
+- Layout: Max-width 640px, table-based, mobile responsive at 640px
+- Style: Cream exec summary with coral left border, coral underline for headers
 
-## Design Requirements
-
-### Typography
-- Headings: Playfair Display
-- Body: Plus Jakarta Sans
-
-### Color Palette
-- Background: #FDF6F0 (warm cream)
-- Text: #1A1A1A (dark charcoal)
-- Accent: #E85A4F (coral)
-- Cards: #FFFFFF (white)
-
-### Layout
-- Max-width: 640px
-- Card padding: 32px
-- Section spacing: 60px vertical
-
-### Key Elements
-- Header: Centered title with date
-- Executive Summary: Cream background with coral left border
-- Section Headers: With coral underline accent
-- Tool Cards: White with subtle shadow
-- Action Items: Three-tier timeline
-
-### Technical Requirements
+## Requirements:
 - All CSS inlined
-- Table-based layout (email compatibility)
-- Google Fonts via link tag
-- Mobile responsive (640px breakpoint)
-
-Output a single, complete HTML file ready for email."""
+- Table layout for email compatibility
+- Include Google Fonts link
+- Output complete, valid HTML ready for email"""
         return (system_prompt, "openai", "gpt-5.2")
     
     return ("You are a helpful assistant.", "openai", "gpt-5.2")
