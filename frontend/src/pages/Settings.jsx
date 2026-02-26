@@ -149,6 +149,22 @@ export default function Settings() {
     }
   };
 
+  const handleSaveApiKeys = async () => {
+    setSaving(prev => ({ ...prev, apiKeys: true }));
+    try {
+      await axios.put(`${API}/settings`, {
+        openai_api_key: settings.openai_api_key,
+        anthropic_api_key: settings.anthropic_api_key,
+        use_custom_keys: settings.use_custom_keys
+      });
+      toast.success("API keys saved");
+    } catch (error) {
+      toast.error("Failed to save API keys");
+    } finally {
+      setSaving(prev => ({ ...prev, apiKeys: false }));
+    }
+  };
+
   const handleSavePrompt = async (agentName) => {
     setSaving(prev => ({ ...prev, [agentName]: true }));
     try {
