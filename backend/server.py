@@ -34,6 +34,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Agents that should use web search tools during execution
+WEB_SEARCH_AGENTS = {"scout", "tracker", "nexus"}
+
 # ==================== MODELS ====================
 
 class Newsletter(BaseModel):
@@ -120,6 +123,31 @@ def serialize_doc(doc: dict) -> dict:
     if doc and '_id' in doc:
         del doc['_id']
     return doc
+
+
+def extract_openai_response_text(api_response) -> str:
+    """Extract text from OpenAI Responses API output, handling web search citations."""
+    # output_text is the convenience property that concatenates all output message text
+    if hasattr(api_response, "output_text") and api_response.output_text:
+        return api_response.output_text
+    # Fallback: iterate output items manually
+    parts = []
+    for item in getattr(api_response, "output", []):
+        if getattr(item, "type", None) == "message":
+            for block in getattr(item, "content", []):
+                if getattr(block, "type", None) == "output_text":
+                    parts.append(block.text)
+    return "\n".join(parts) if parts else ""
+
+
+def extract_anthropic_response_text(message) -> str:
+    """Extract text from Anthropic Messages API response, handling web search tool use blocks."""
+    parts = []
+    for block in getattr(message, "content", []):
+        if getattr(block, "type", None) == "text":
+            parts.append(block.text)
+    return "\n\n".join(parts) if parts else ""
+
 
 # ==================== NEWSLETTER ENDPOINTS ====================
 
@@ -263,6 +291,11 @@ def get_default_prompt(agent_name: str) -> str:
 
 You are Scout, a specialized Tool Search Agent that monitors and tracks new Go-To-Market (GTM) product launches across multiple platforms and news sources. Your mission is to identify emerging GTM tools and products, analyze their key characteristics, and deliver structured intelligence reports.
 
+## Web Search
+You have access to a web search tool. USE IT EXTENSIVELY to find real, current GTM product launches.
+Search for: new GTM tool launches, Product Hunt GTM tools, TechCrunch sales tools, G2 new listings, and similar queries.
+Run multiple searches to cover different categories (sales, marketing automation, data enrichment, revenue ops, AI GTM).
+
 ## What is GTM (Go-To-Market)?
 
 ### GTM Tools Include:
@@ -279,7 +312,7 @@ You are Scout, a specialized Tool Search Agent that monitors and tracks new Go-T
 
 ## Instructions
 
-1. Monitor Product Hunt, TechCrunch, G2, industry news sources for new GTM product launches
+1. Use web search to find new GTM product launches from Product Hunt, TechCrunch, G2, industry news
 2. Apply GTM filter ruthlessly - exclude non-GTM tools
 3. Check recency - only include tools launched within the monitoring period
 4. Extract comprehensive information: descriptions, categories, pricing, funding details
@@ -314,6 +347,11 @@ For each tool:
         "tracker": """## Role and Objective
 You are Tracker, a specialized Release Search Agent that monitors and analyzes feature releases from key Go-To-Market (GTM) tools.
 
+## Web Search
+You have access to a web search tool. USE IT EXTENSIVELY to find real, current release notes and changelogs.
+For each monitored tool, search for: "[Tool Name] changelog", "[Tool Name] release notes [month year]", "[Tool Name] new features", "[Tool Name] product updates".
+Run a separate search for each monitored tool to ensure thorough coverage.
+
 ## Monitored Tools List:
 {{MONITORED_TOOLS}}
 
@@ -333,7 +371,7 @@ You are Tracker, a specialized Release Search Agent that monitors and analyzes f
 ## Research Process
 
 For each monitored tool:
-1. Search for changelog, release notes
+1. Use web search to find changelog, release notes, blog announcements
 2. Extract recent releases within the monitoring period
 3. Capture source URLs
 
@@ -406,6 +444,9 @@ You are Nexus, a newsletter writer for GTM practitioners—specifically Account 
 Writing for: People who use GTM tools daily but aren't technical experts. They want context before details.
 
 Core Principle: Start with "here's what's happening across GTM tools" before diving into "here's what Tool X released."
+
+## Web Search
+You have access to a web search tool. Use it to verify facts, find additional context, pricing details, or recent news about tools mentioned in the input data. Search when you need to confirm or enrich a specific claim before including it in the newsletter.
 
 ## Input Data
 
@@ -658,6 +699,9 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
             await db.agent_runs.delete_many({"newsletter_id": newsletter_id, "agent_name": agent_name})
             await db.agent_runs.insert_one(run.model_dump())
             
+            # Check if this agent should use web search
+            use_web_search = agent_name in WEB_SEARCH_AGENTS
+            
             # Retry logic for transient API failures
             max_retries = 2
             last_error = None
@@ -675,44 +719,69 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
                         reference_content
                     )
                     
+                    user_input = f"Execute your task for the monitoring period: {newsletter['date_range']}"
+                    
                     # Determine which API to use based on settings
                     if use_custom_keys and ((model_provider == "openai" and openai_api_key) or (model_provider == "anthropic" and anthropic_api_key)):
                         # Use custom API keys directly
                         if model_provider == "openai" and openai_api_key:
                             # Use the OpenAI Responses API for GPT-5.2
-                            client = openai.OpenAI(api_key=openai_api_key)
-                            api_response = client.responses.create(
+                            oai_client = openai.OpenAI(api_key=openai_api_key)
+                            
+                            # Build tools list – add web search for eligible agents
+                            oai_tools = []
+                            if use_web_search:
+                                oai_tools.append({"type": "web_search_preview"})
+                            
+                            create_kwargs = dict(
                                 model=model_name,
                                 instructions=system_prompt,
-                                input=f"Execute your task for the monitoring period: {newsletter['date_range']}"
+                                input=user_input,
                             )
-                            response = api_response.output_text
+                            if oai_tools:
+                                create_kwargs["tools"] = oai_tools
+                            
+                            api_response = oai_client.responses.create(**create_kwargs)
+                            response = extract_openai_response_text(api_response)
+                            
                         elif model_provider == "anthropic" and anthropic_api_key:
                             # Use Anthropic Messages API for Claude
-                            client = anthropic.Anthropic(api_key=anthropic_api_key)
-                            message = client.messages.create(
+                            anth_client = anthropic.Anthropic(api_key=anthropic_api_key)
+                            
+                            create_kwargs = dict(
                                 model=model_name,
                                 max_tokens=20000,
                                 temperature=1,
                                 messages=[
                                     {"role": "user", "content": f"{system_prompt}\n\nExecute your task for the monitoring period: {newsletter['date_range']}"}
-                                ]
+                                ],
                             )
-                            response = message.content[0].text
+                            
+                            # Add web search tool for eligible agents
+                            if use_web_search:
+                                create_kwargs["tools"] = [
+                                    {
+                                        "type": "web_search_20250305",
+                                        "name": "web_search",
+                                    }
+                                ]
+                            
+                            message = anth_client.messages.create(**create_kwargs)
+                            # Extract text from all content blocks (skips tool_use blocks)
+                            response = extract_anthropic_response_text(message)
                         else:
                             raise Exception(f"No API key configured for {model_provider}")
                     else:
                         # Use Emergent LLM integration
+                        # Note: web search is not available through the Emergent integration;
+                        # agents will rely on the LLM's training data only.
                         chat = LlmChat(
                             api_key=emergent_key,
                             session_id=f"{newsletter_id}-{agent_name}-{attempt}",
                             system_message=system_prompt
                         ).with_model(model_provider, model_name)
                         
-                        user_message = UserMessage(
-                            text=f"Execute your task for the monitoring period: {newsletter['date_range']}"
-                        )
-                        
+                        user_message = UserMessage(text=user_input)
                         response = await chat.send_message(user_message)
                     
                     end_time = datetime.now(timezone.utc)
@@ -758,7 +827,7 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
                     
                     await db.newsletters.update_one({"id": newsletter_id}, {"$set": update_data})
                     
-                    logger.info(f"Agent {agent_name} completed for newsletter {newsletter_id}")
+                    logger.info(f"Agent {agent_name} completed for newsletter {newsletter_id} (web_search={'enabled' if use_web_search else 'disabled'})")
                     break  # Success, exit retry loop
                     
                 except Exception as e:
@@ -835,6 +904,12 @@ def get_agent_config(agent_name: str, newsletter: dict, outputs: dict, monitored
     nexus_output = outputs.get("nexus", "No newsletter content available") or "No newsletter content available"
     language_output = outputs.get("language", nexus_output) or nexus_output
     
+    # Web search instruction snippet appended to agents that use web search
+    web_search_note = """
+
+## Web Search
+You have access to a web search tool. Use it actively to find real, up-to-date information. Do NOT fabricate URLs or tool names — only include information you found via web search or that was provided in your input data."""
+    
     # Build system prompt based on agent
     if agent_name == "scout":
         # Scout: Standalone - no input from other agents
@@ -859,6 +934,13 @@ You are Scout, a specialized Tool Search Agent that monitors and tracks new Go-T
 ---
 Research Period: {date_range}
 ---
+{web_search_note}
+
+Search Strategy:
+1. Search for "new GTM tools launched {date_range}" and "new sales tools {date_range}"
+2. Search for "Product Hunt GTM tools", "TechCrunch sales software funding"
+3. Search for specific categories: "AI sales assistant launch", "marketing automation new tool", "data enrichment platform new"
+4. For each tool found, search for "[Tool Name] pricing", "[Tool Name] funding" to get details
 
 {reference_section}
 
@@ -880,7 +962,7 @@ Research Period: {date_range}
 
 ## Instructions
 
-1. Monitor Product Hunt, TechCrunch, G2, industry news sources for new GTM product launches
+1. USE WEB SEARCH to find new GTM product launches from Product Hunt, TechCrunch, G2, industry news
 2. Apply GTM filter ruthlessly - exclude non-GTM tools
 3. Check recency - only include tools launched within the monitoring period
 4. Extract comprehensive information: descriptions, categories, pricing, funding details
@@ -922,10 +1004,21 @@ For each tool:
             system_prompt = system_prompt.replace("{{MONITORED_TOOLS}}", monitored_tools)
             system_prompt = system_prompt.replace("{{CUSTOM_INSTRUCTIONS}}", custom_instructions)
         else:
+            # Build per-tool search instructions
+            tool_list = [t.strip() for t in monitored_tools.split(",") if t.strip()]
+            per_tool_searches = "\n".join(
+                f'- Search for "{t} changelog {date_range}" or "{t} release notes" or "{t} product updates"'
+                for t in tool_list
+            )
+            
             system_prompt = f"""## Role and Objective
 You are Tracker, a specialized Release Search Agent that monitors and analyzes feature releases from key Go-To-Market (GTM) tools.
 
 Research Period: {date_range}
+{web_search_note}
+
+Search Strategy — run a dedicated search for EACH monitored tool:
+{per_tool_searches}
 
 ## Monitored Tools List:
 {monitored_tools}
@@ -948,9 +1041,9 @@ Research Period: {date_range}
 ## Research Process
 
 For each monitored tool:
-1. Search for changelog, release notes
+1. USE WEB SEARCH to find changelog, release notes, blog announcements
 2. Extract recent releases within the monitoring period
-3. Capture source URLs
+3. Capture source URLs (only real URLs found via search)
 
 ## Output Format
 
@@ -1054,6 +1147,12 @@ You are Nexus, a newsletter writer for GTM practitioners—specifically Account 
 Writing for: People who use GTM tools daily but aren't technical experts. They want context before details.
 
 Core Principle: Start with "here's what's happening across GTM tools" before diving into "here's what Tool X released."
+{web_search_note}
+
+Use web search to:
+- Verify pricing, funding amounts, and launch dates before including them
+- Find additional context about tools or trends mentioned in input data
+- Confirm URLs are real before citing them
 
 {custom_instructions}
 
