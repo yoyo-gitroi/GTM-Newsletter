@@ -1,0 +1,136 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "Newsletter Intelligence",
+      "archetype": "Swiss & High-Contrast",
+      "vibe": "Objective, rigid, functional, high-density",
+      "principle": "Information clarity, functional beauty, density"
+    },
+    "typography": {
+      "font_family": {
+        "headings": "Manrope, sans-serif",
+        "body": "Inter, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "scaling": {
+        "h1": "text-4xl font-bold tracking-tight",
+        "h2": "text-2xl font-semibold tracking-tight",
+        "h3": "text-xl font-medium tracking-normal",
+        "body": "text-sm leading-relaxed",
+        "caption": "text-xs text-muted-foreground",
+        "mono": "text-xs font-mono"
+      }
+    },
+    "colors": {
+      "theme": "light",
+      "palette": {
+        "background": "#ffffff",
+        "foreground": "#09090b",
+        "sidebar": {
+          "background": "#18181b",
+          "foreground": "#fafafa",
+          "border": "#27272a"
+        },
+        "card": {
+          "background": "#ffffff",
+          "border": "#e4e4e7"
+        },
+        "primary": {
+          "default": "#18181b",
+          "foreground": "#fafafa"
+        },
+        "status": {
+          "success": "#10b981", 
+          "running": "#3b82f6",
+          "pending": "#f59e0b",
+          "failed": "#ef4444"
+        },
+        "accent": "#2563eb"
+      }
+    },
+    "layout": {
+      "spacing": "comfortable",
+      "container": "max-w-7xl mx-auto px-6",
+      "radius": "rounded-lg",
+      "grid_strategy": "Bento Grid Mode B (High Density)"
+    },
+    "components": {
+      "buttons": {
+        "style": "sharp-corner or subtle rounded-md",
+        "variants": {
+          "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+          "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "ghost": "hover:bg-accent hover:text-accent-foreground",
+          "outline": "border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+        }
+      },
+      "cards": {
+        "style": "flat, 1px border, no shadow by default",
+        "hover": "hover:border-zinc-400 transition-colors duration-200"
+      },
+      "inputs": {
+        "style": "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      }
+    },
+    "motion": {
+      "transitions": "transition-all duration-200 ease-in-out",
+      "micro_interactions": "active:scale-95",
+      "loading": "animate-pulse"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-md bg-white/70 border border-white/20",
+    "gradients": "None. Use solid colors and 1px borders.",
+    "shadows": "shadow-sm for dropdowns/modals only",
+    "borders": "1px solid #e4e4e7 (zinc-200)"
+  },
+  "specific_pages": {
+    "dashboard": {
+      "layout": "Sidebar + Main Content Area",
+      "sidebar": "Fixed width (240px), Dark theme (#18181b), vertically simplistic",
+      "stats_row": "Grid of 3-4 cards at top, simple metrics, big numbers",
+      "newsletter_list": "Table layout with status badges, date, actions"
+    },
+    "pipeline_view": {
+      "layout": "Vertical Timeline / Stepper",
+      "agent_card": {
+        "default": "Collapsed: Status Icon + Name + Duration + Status Badge",
+        "expanded": "Full width, monospace logs output, 'Trace Beam' border effect if running",
+        "running_state": "Border pulses blue, 'Working...' text animates"
+      }
+    },
+    "new_newsletter": {
+      "layout": "Centered form container, max-w-2xl",
+      "elements": "Date Range Picker (Calendar), Reference Select, Custom Instructions (Textarea)"
+    },
+    "preview": {
+      "layout": "Split pane or Tabs (Preview / Raw HTML)",
+      "preview_pane": "Iframe with sandbox isolation",
+      "code_pane": "Syntax highlighted HTML (Prism or similar if available, else generic mono)"
+    }
+  },
+  "assets": {
+    "icons": "Lucide React (already installed)",
+    "logo": "Text-based 'GTM Intel' in Manrope Bold, or simple geometric shape (Square with dot)",
+    "images": "None required. Use UI elements and typography."
+  },
+  "universal_guidelines": [
+    "Use 'Manrope' for all Headings. Use 'Inter' for body text.",
+    "Sidebar MUST be dark (#18181b). Main content MUST be light.",
+    "Status badges: Small, rounded-full, px-2.5 py-0.5, text-xs font-semibold. (e.g. bg-emerald-100 text-emerald-700)",
+    "Agent Output: MUST be in a scrollable box with 'font-mono text-xs' and 'bg-zinc-50' background.",
+    "Do not use gradients. Use borders and whitespace for separation.",
+    "Interactive elements must have hover states (e.g., table rows highlight on hover).",
+    "Use 'sonner' for all notifications.",
+    "Date picker: Use shadcn Popover + Calendar.",
+    "All interactive elements MUST have data-testid attributes."
+  ],
+  "instructions_to_main_agent": {
+    "step_1": "Install additional dependencies: `yarn add @radix-ui/react-icons clsx tailwind-merge` (if not present).",
+    "step_2": "Configure Tailwind theme in `tailwind.config.js` to match the specific color palette (extend colors).",
+    "step_3": "Create the SidebarLayout component that wraps the main content.",
+    "step_4": "Build the 'AgentCard' component with the expandable state and status logic.",
+    "step_5": "Implement the Dashboard table with status badges.",
+    "step_6": "Create the Pipeline view with the vertical stepper visualization."
+  }
+}
