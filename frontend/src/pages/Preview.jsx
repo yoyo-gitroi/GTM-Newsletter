@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API } from "@/lib/api";
 import { 
   ArrowLeft, 
   Eye, 
@@ -16,8 +17,6 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
 export default function Preview() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -25,11 +24,7 @@ export default function Preview() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetchNewsletter();
-  }, [id]);
-
-  const fetchNewsletter = async () => {
+  const fetchNewsletter = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/newsletters/${id}`);
       setNewsletter(res.data);
@@ -39,7 +34,11 @@ export default function Preview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchNewsletter();
+  }, [fetchNewsletter]);
 
   const handleCopy = async () => {
     if (!newsletter?.html_output) return;

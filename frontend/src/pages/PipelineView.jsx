@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API } from "@/lib/api";
 import { format } from "date-fns";
 import { 
   Play, 
@@ -28,8 +29,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AGENTS = [
   { 
@@ -90,13 +89,7 @@ export default function PipelineView() {
   const [expandedAgents, setExpandedAgents] = useState({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
-  }, [id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [newsletterRes, statusRes] = await Promise.all([
         axios.get(`${API}/newsletters/${id}`),
@@ -110,7 +103,13 @@ export default function PipelineView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 3000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
   const startPipeline = async () => {
     try {

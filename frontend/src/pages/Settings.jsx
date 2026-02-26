@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { API } from "@/lib/api";
 import { 
   Save, 
   Loader2, 
@@ -30,8 +31,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AGENTS = [
   { 
