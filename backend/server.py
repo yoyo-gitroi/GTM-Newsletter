@@ -675,20 +675,45 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
                         reference_content
                     )
                     
-                    # Create chat instance
-                    chat = LlmChat(
-                        api_key=api_key,
-                        session_id=f"{newsletter_id}-{agent_name}-{attempt}",
-                        system_message=system_prompt
-                    ).with_model(model_provider, model_name)
-                    
-                    # Create user message
-                    user_message = UserMessage(
-                        text=f"Execute your task for the monitoring period: {newsletter['date_range']}"
-                    )
-                    
-                    # Get response
-                    response = await chat.send_message(user_message)
+                    # Determine which API to use based on settings
+                    if use_custom_keys and ((model_provider == "openai" and openai_api_key) or (model_provider == "anthropic" and anthropic_api_key)):
+                        # Use custom API keys directly
+                        if model_provider == "openai" and openai_api_key:
+                            client = openai.AsyncOpenAI(api_key=openai_api_key)
+                            completion = await client.chat.completions.create(
+                                model=model_name,
+                                messages=[
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": f"Execute your task for the monitoring period: {newsletter['date_range']}"}
+                                ],
+                                max_tokens=16000
+                            )
+                            response = completion.choices[0].message.content
+                        elif model_provider == "anthropic" and anthropic_api_key:
+                            client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
+                            message = await client.messages.create(
+                                model=model_name,
+                                max_tokens=16000,
+                                messages=[
+                                    {"role": "user", "content": f"{system_prompt}\n\nExecute your task for the monitoring period: {newsletter['date_range']}"}
+                                ]
+                            )
+                            response = message.content[0].text
+                        else:
+                            raise Exception(f"No API key configured for {model_provider}")
+                    else:
+                        # Use Emergent LLM integration
+                        chat = LlmChat(
+                            api_key=emergent_key,
+                            session_id=f"{newsletter_id}-{agent_name}-{attempt}",
+                            system_message=system_prompt
+                        ).with_model(model_provider, model_name)
+                        
+                        user_message = UserMessage(
+                            text=f"Execute your task for the monitoring period: {newsletter['date_range']}"
+                        )
+                        
+                        response = await chat.send_message(user_message)
                     
                     end_time = datetime.now(timezone.utc)
                     duration = int((end_time - start_time).total_seconds())
