@@ -100,10 +100,15 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
   const [settings, setSettings] = useState({
-    monitored_tools: ""
+    monitored_tools: "",
+    openai_api_key: "",
+    anthropic_api_key: "",
+    use_custom_keys: false
   });
   const [prompts, setPrompts] = useState({});
   const [expandedAgents, setExpandedAgents] = useState({});
+  const [showOpenAIKey, setShowOpenAIKey] = useState(false);
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
 
   useEffect(() => {
     fetchData();
