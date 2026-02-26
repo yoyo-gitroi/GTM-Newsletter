@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/lib/api";
@@ -24,11 +24,7 @@ export default function Preview() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetchNewsletter();
-  }, [id]);
-
-  const fetchNewsletter = async () => {
+  const fetchNewsletter = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/newsletters/${id}`);
       setNewsletter(res.data);
@@ -38,7 +34,11 @@ export default function Preview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchNewsletter();
+  }, [fetchNewsletter]);
 
   const handleCopy = async () => {
     if (!newsletter?.html_output) return;
