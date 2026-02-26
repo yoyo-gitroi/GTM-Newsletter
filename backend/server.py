@@ -85,6 +85,19 @@ class AgentRun(BaseModel):
     model: Optional[str] = None
     duration: Optional[int] = None
 
+class AgentPrompt(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    agent_name: str  # scout, tracker, sage, nexus, language, html
+    prompt: str
+    is_active: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class AgentPromptUpdate(BaseModel):
+    prompt: str
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
