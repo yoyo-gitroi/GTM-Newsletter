@@ -32,3 +32,12 @@
         transform: rotate(360deg);
     }
 }
+
+/* Additional styles for the app */
+.font-manrope {
+    font-family: 'Manrope', sans-serif;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', monospace;
+}
