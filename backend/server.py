@@ -313,32 +313,37 @@ async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None)
             await db.agent_runs.delete_many({"newsletter_id": newsletter_id, "agent_name": agent_name})
             await db.agent_runs.insert_one(run.model_dump())
             
-            try:
-                start_time = datetime.now(timezone.utc)
-                
-                # Get the system prompt and model for this agent
-                system_prompt, model_provider, model_name = get_agent_config(
-                    agent_name, 
-                    newsletter, 
-                    outputs, 
-                    monitored_tools,
-                    reference_content
-                )
-                
-                # Create chat instance
-                chat = LlmChat(
-                    api_key=api_key,
-                    session_id=f"{newsletter_id}-{agent_name}",
-                    system_message=system_prompt
-                ).with_model(model_provider, model_name)
-                
-                # Create user message
-                user_message = UserMessage(
-                    text=f"Execute your task for the monitoring period: {newsletter['date_range']}"
-                )
-                
-                # Get response
-                response = await chat.send_message(user_message)
+            # Retry logic for transient API failures
+            max_retries = 2
+            last_error = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    start_time = datetime.now(timezone.utc)
+                    
+                    # Get the system prompt and model for this agent
+                    system_prompt, model_provider, model_name = get_agent_config(
+                        agent_name, 
+                        newsletter, 
+                        outputs, 
+                        monitored_tools,
+                        reference_content
+                    )
+                    
+                    # Create chat instance
+                    chat = LlmChat(
+                        api_key=api_key,
+                        session_id=f"{newsletter_id}-{agent_name}-{attempt}",
+                        system_message=system_prompt
+                    ).with_model(model_provider, model_name)
+                    
+                    # Create user message
+                    user_message = UserMessage(
+                        text=f"Execute your task for the monitoring period: {newsletter['date_range']}"
+                    )
+                    
+                    # Get response
+                    response = await chat.send_message(user_message)
                 
                 end_time = datetime.now(timezone.utc)
                 duration = int((end_time - start_time).total_seconds())
