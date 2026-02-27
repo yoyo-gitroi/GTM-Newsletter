@@ -638,7 +638,11 @@ async def get_pipeline_status(newsletter_id: str):
 
 async def execute_pipeline(newsletter_id: str, start_from: Optional[str] = None):
     """Execute the full agent pipeline"""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+    except ImportError:
+        LlmChat = None
+        UserMessage = None
     import anthropic
     import openai
     
